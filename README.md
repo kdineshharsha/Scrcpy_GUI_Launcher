@@ -30,10 +30,6 @@ assets/
 ```
 
 ![Main UI](assets/main-ui.png)
-<<<<<<< HEAD
-=======
-```
->>>>>>> 860decb9c1d4f15404620dec8f663101b8d492d5
 
 ---
 
