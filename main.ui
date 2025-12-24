@@ -157,7 +157,7 @@
     <property name="title">
      <string>Help</string>
     </property>
-    <addaction name="actionHow_to_setup"/>
+    <addaction name="actionHelp"/>
     <addaction name="actionAbout"/>
    </widget>
    <addaction name="menuConnect"/>
@@ -174,7 +174,7 @@
     <string>Manual Connect</string>
    </property>
   </action>
-  <action name="actionHow_to_setup">
+  <action name="actionHelp">
    <property name="text">
     <string>How to setup</string>
    </property>

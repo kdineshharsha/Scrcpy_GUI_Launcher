@@ -47,6 +47,8 @@ searchInput = window.findChild(QLineEdit, "searchInput")
 appList = window.findChild(QListWidget, "appList")
 manualAction = window.findChild(QAction, "actionManual_Connect")
 autoAction = window.findChild(QAction, "actionAutomatic_Connect")
+helpAction = window.findChild(QAction, "actionHelp")
+aboutAction = window.findChild(QAction, "actionAbout")
 device = window.findChild(QLabel, "txtDevice")
 status = window.findChild(QLabel, "txtStatus")
 # ---------------- TEST CONNECTIONS ----------------
@@ -283,12 +285,35 @@ def open_manual_connect():
     dialog.exec()
 
 
+def open_help():
+    file = QFile(resource_path("help.ui"))
+    file.open(QFile.ReadOnly)
+
+    loader = QUiLoader()
+    dialog = loader.load(file, window)
+    file.close()
+
+    dialog.exec()
+
+
+def open_about():
+    file = QFile(resource_path("about.ui"))
+    file.open(QFile.ReadOnly)
+
+    loader = QUiLoader()
+    dialog = loader.load(file, window)
+    file.close()
+
+    dialog.exec()
+
+
 startBtn.clicked.connect(on_start_clicked)
 recordBtn.clicked.connect(on_record_clicked)
 searchInput.textChanged.connect(on_search_changed)
 manualAction.triggered.connect(open_manual_connect)
 autoAction.triggered.connect(open_auto_connect)
-
+helpAction.triggered.connect(open_help)
+aboutAction.triggered.connect(open_about)
 
 # fill_app_list()
 check_adb_device()
