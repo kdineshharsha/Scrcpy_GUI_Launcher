@@ -1,0 +1,23 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.env/
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Executables
+*.exe
+
+# External tools (adb / scrcpy)
+tools/
+
+# OS files
+Thumbs.db
+.DS_Store
