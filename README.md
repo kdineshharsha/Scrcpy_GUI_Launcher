@@ -29,7 +29,9 @@ assets/
  └── recording.png
 ```
 
-![Main UI](assets/main-ui.png)
+<p align="center">
+  <img src="assets/main-ui.png" alt="Main UI" width="300">
+</p>
 
 ---
 
