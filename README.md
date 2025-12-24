@@ -22,8 +22,6 @@ Built with **Python + PySide6**.
 
 ## 🖼️ Screenshots
 
-Add screenshots to make your project stand out.
-
 ```
 assets/
  ├── main-ui.png
@@ -33,8 +31,6 @@ assets/
 
 ```md
 ![Main UI](assets/main-ui.png)
-![Manual Connect](assets/manual-connect.png)
-![Screen Recording](assets/recording.png)
 ```
 
 ---
