@@ -14,6 +14,23 @@ from PySide6.QtCore import QFile
 import subprocess
 from datetime import datetime
 import re
+import platform
+
+
+def run_cmd(cmd, background=False):
+    if platform.system() == "Windows":
+        if background:
+            return subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    else:
+        if background:
+            return subprocess.Popen(cmd)
+        return subprocess.run(cmd, capture_output=True, text=True)
 
 
 def resource_path(relative_path):
@@ -65,10 +82,15 @@ def on_start_clicked():
         return
     package_name = item.text()
 
-    command = [tool_path("scrcpy.exe"), "--new-display", "--start-app", package_name]
+    if platform.system == "Windows":
+        scrcpy_path = tool_path("scrcpy.exe")
+    else:
+        scrcpy_path = tool_path("scrcpy")
+
+    command = [scrcpy_path, "--new-display", "--start-app", package_name]
 
     try:
-        subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
+        run_cmd(command, background=True)
     except Exception as e:
         QMessageBox.critical(window, "Scrcpy Error", str(e))
 
@@ -84,8 +106,13 @@ def on_record_clicked():
     package_name = item.text()
     file_name = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
 
+    if platform.system == "Windows":
+        scrcpy_path = tool_path("scrcpy.exe")
+    else:
+        scrcpy_path = tool_path("scrcpy")
+
     command = [
-        tool_path("scrcpy.exe"),
+        scrcpy_path,
         "--new-display",
         "--start-app",
         package_name,
@@ -94,23 +121,15 @@ def on_record_clicked():
     ]
 
     try:
-        subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
+        run_cmd(command, background=True)
     except Exception as e:
         QMessageBox.critical(window, "Scrcpy Error", str(e))
 
 
 def check_adb_device():
-
-    # open_auto_connect()
-
     try:
-        output = subprocess.check_output(
-            [tool_path("adb"), "devices"],
-            text=True,
-            errors="ignore",
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        print(output)
+        result = run_cmd([tool_path("adb"), "devices"])
+        output = result.stdout
 
     except Exception:
         status.setText("ADB not found")
@@ -119,46 +138,50 @@ def check_adb_device():
     lines = output.strip().splitlines()[1:]  # skip header
 
     if not lines:
-        status.setText("No device")
+        status.setText("Status: No device")
+        device.setText("Device: -")
         return False
 
     for line in lines:
         serial, state = line.split("\t")
 
-        device_name = subprocess.check_output(
-            [tool_path("adb"), "-s", serial, "shell", "getprop", "ro.product.model"],
-            text=True,
-            errors="ignore",
-            creationflags=subprocess.CREATE_NO_WINDOW,
+        # get device name
+        name_result = run_cmd(
+            [tool_path("adb"), "-s", serial, "shell", "getprop", "ro.product.model"]
         )
-        device.setText(f"Device: {device_name.strip()}")
+        device_name = name_result.stdout.strip()
+
+        device.setText(f"Device: {device_name}")
 
         if state == "device":
-            status.setText("Status: Connected🟢")
-
+            status.setText("Status: Connected 🟢")
             fill_app_list()
             return True
 
         if state == "offline":
-            status.setText("Status: Offline🔴")
+            status.setText("Status: Offline 🔴")
             return False
 
         if state == "unauthorized":
-            status.setText("Status: Unauthorized⚠️")
+            status.setText("Status: Unauthorized ⚠️")
             return False
 
+    status.setText("Status: Unknown")
     return False
 
 
 def get_packages():
     try:
-        out = subprocess.check_output(
-            [tool_path("adb"), "shell", "pm", "list", "packages", "-3"],
-            text=True,
-            errors="ignore",
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        return [line.replace("package:", "") for line in out.splitlines()]
+        result = run_cmd([tool_path("adb"), "shell", "pm", "list", "packages", "-3"])
+
+        output = result.stdout or ""
+
+        return [
+            line.replace("package:", "")
+            for line in output.splitlines()
+            if line.startswith("package:")
+        ]
+
     except Exception as e:
         QMessageBox.warning(window, "ADB Error", str(e))
         return []
@@ -183,42 +206,44 @@ def on_search_changed(text):
             appList.addItem(app)
 
 
-def open_auto_connect():
+def get_gateway_ip():
     try:
-        output = subprocess.check_output(
-            ["netsh", "interface", "ip", "show", "config", "name=Wi-Fi"],
-            encoding="utf-8",
-            text=True,
-            errors="ignore",
-        )
-    except Exception as e:
-        QMessageBox.critical(window, "Network Error", str(e))
-        return
+        if platform.system() == "Windows":
+            result = run_cmd(
+                ["netsh", "interface", "ip", "show", "config", "name=Wi-Fi"]
+            )
+            match = re.search(r"Default Gateway:\s+([\d.]+)", result.stdout)
+            return match.group(1) if match else None
 
-    match = re.search(r"Default Gateway:\s+([\d.]+)", output)
+        else:  # Linux
+            result = run_cmd(["ip", "route"])
+            match = re.search(r"default via ([\d.]+)", result.stdout)
+            return match.group(1) if match else None
 
-    if not match:
+    except Exception:
+        return None
+
+
+def open_auto_connect():
+    gateway_ip = get_gateway_ip()
+
+    if not gateway_ip:
         QMessageBox.warning(
             window, "Auto Connect Failed", "Could not detect Wi-Fi gateway IP."
         )
         return
 
-    gateway_ip = match.group(1)
+    # Restart adb in TCP mode
+    run_cmd([tool_path("adb"), "tcpip", "5555"])
 
-    subprocess.run(
-        [tool_path("adb"), "tcpip", "5555"], creationflags=subprocess.CREATE_NO_WINDOW
-    )
+    # Connect to device
+    result = run_cmd([tool_path("adb"), "connect", f"{gateway_ip}:5555"])
 
-    result = subprocess.run(
-        [tool_path("adb"), "connect", f"{gateway_ip}:5555"],
-        capture_output=True,
-        text=True,
-    )
-
-    print(result)
     fill_app_list()
 
-    if "connected" in result.stdout.lower():
+    output = (result.stdout or result.stderr).lower()
+
+    if "connected" in output:
         QMessageBox.information(
             window, "Connected", f"Connected to device at {gateway_ip}:5555"
         )
@@ -259,29 +284,32 @@ def open_manual_connect():
 
     def adb_connect():
         ip = ipInput.text().strip()
-        port = portInput.text().strip()
+        port = portInput.text().strip() or "5555"
 
         if not ip:
             QMessageBox.information(
-                dialog, "Input Error", "Please enter both IP address and port."
+                dialog, "Input Error", "Please enter an IP address."
             )
             return
-        if not port:
-            port = "5555"
-
-        command = [tool_path("adb"), "connect", f"{ip}:{port}"]
 
         try:
-            output = subprocess.run(command, capture_output=True, text=True)
-            QMessageBox.information(dialog, "ADB Connect", output.stdout.strip())
+            result = run_cmd([tool_path("adb"), "connect", f"{ip}:{port}"])
+
+            output = (result.stdout or result.stderr).strip()
+
+            QMessageBox.information(
+                dialog, "ADB Connect", output if output else "Command executed."
+            )
 
         except Exception as e:
             QMessageBox.critical(dialog, "ADB Error", str(e))
             return
+
         dialog.accept()
 
     cancelBtn.clicked.connect(dialog.close)
     connectBtn.clicked.connect(adb_connect)
+
     dialog.exec()
 
 
